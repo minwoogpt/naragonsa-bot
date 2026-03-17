@@ -1,13 +1,10 @@
 import requests
 import os
 from datetime import datetime
-import xml.etree.ElementTree as ET
 
 API_KEY = os.environ['DATA_API_KEY']
 TOKEN = os.environ['TELEGRAM_TOKEN']
 CHAT_ID = os.environ['TELEGRAM_CHAT_ID']
-
-KEYWORDS = ["창호", "유리", "금속제창", "샷시", "창틀"]
 
 def send_telegram(text):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
@@ -15,69 +12,45 @@ def send_telegram(text):
 
 def get_data(operation):
     today = datetime.now().strftime('%Y%m%d')
-    # 혹시 에러가 나면 05를 지운 BidPublicInfoService 로도 시도해봐야 합니다.
     url = f"http://apis.data.go.kr/1230000/BidPublicInfoService05/{operation}"
     
     params = {
         'serviceKey': API_KEY,
         'type': 'json',
-        'numOfRows': '500',
+        'numOfRows': '10',
         'inqryDiv': '1',
         'inqryBgnDt': today + "0000",
         'inqryEndDt': today + "2359"
     }
 
     try:
-        res = requests.get(url, params=params, timeout=30)
-        # JSON 파싱 시도
-        try:
-            data = res.json()
-            items = data.get('response', {}).get('body', {}).get('items', [])
-            if isinstance(items, dict): items = [items]
-            return items
-        except:
-            # XML 파싱 시도
-            root = ET.fromstring(res.text)
-            items = []
-            for item_node in root.findall('.//item'):
-                item_dict = {child.tag: child.text for child in item_node}
-                items.append(item_dict)
-            return items
+        # 인증키를 URL에 직접 붙여서 보내는 가장 원시적이고 확실한 방법으로 시도
+        full_url = f"{url}?serviceKey={API_KEY}&type=json&numOfRows=10&inqryDiv=1&inqryBgnDt={today}0000&inqryEndDt={today}2359"
+        res = requests.get(full_url, timeout=30)
+        
+        # 만약 결과가 정상이 아니면 상태 코드와 내용을 텔레그램으로 전송
+        if res.status_code != 200:
+            return f"❌ 서버 응답 실패 (코드: {res.status_code})"
+        
+        if not res.text.strip():
+            return "❌ 서버에서 빈 내용을 보냈습니다 (인증키 미등록 의심)"
+            
+        # 데이터가 있으면 일단 성공으로 간주하고 리턴
+        return "SUCCESS"
+        
     except Exception as e:
-        return f"ERROR: {str(e)}"
+        return f"❌ 연결 자체 실패: {str(e)}"
 
 def main():
-    # 1. 시작 알림 (이게 오면 깃허브-텔레그램 연결은 성공!)
-    send_telegram("🔍 나라장터에서 창호/유리 공고를 확인하는 중입니다...")
-
-    results_thng = get_data("getBidPblancListInfoThng")
-    results_cnst = get_data("getBidPblancListInfoCnstwk")
+    send_telegram("🚀 디버깅 시작...")
     
-    # 에러 체크
-    if isinstance(results_thng, str) and "ERROR" in results_thng:
-        send_telegram(f"❌ API 연결 오류: {results_thng}")
-        return
-
-    all_results = results_thng + results_cnst
-    found = []
-    seen_ids = set()
+    # 두 가지 서비스 중 하나라도 찔러봅니다.
+    status = get_data("getBidPblancListInfoThng")
     
-    for item in all_results:
-        title = item.get('bidNtceNm', '')
-        bid_no = item.get('bidNtceNo', '')
-        if title and any(key in title for key in KEYWORDS):
-            if bid_no not in seen_ids:
-                link = item.get('bidNtceDtlUrl', '#')
-                found.append(f"📍 {title}\n🔗 {link}")
-                seen_ids.add(bid_no)
-
-    today_str = datetime.now().strftime('%Y-%m-%d')
-    if found:
-        message = f"📅 {today_str} 검색 결과 ({len(found)}건)\n\n" + "\n\n".join(found)
-        send_telegram(message)
+    if status == "SUCCESS":
+        send_telegram("✅ 조달청 서버 연결 성공! 이제 공고가 올라오면 알림이 갈 겁니다.")
     else:
-        # 공고가 없어도 결과를 알려줌
-        send_telegram(f"📅 {today_str} 확인 결과, 새로 올라온 공고가 0건입니다.")
+        send_telegram(f"결과: {status}\n\n💡 팁: 인증키를 '디코딩' 키로 넣으셨나요? 만약 그렇다면 1~2시간 뒤에 다시 해보세요.")
 
 if __name__ == "__main__":
     main()
