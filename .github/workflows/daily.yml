@@ -1,7 +1,7 @@
 name: daily-bid-check
 on:
   schedule:
-    - cron: '0 10 * * *' # 한국시간 저녁 7시
+    - cron: '31 15 * * *' # 한국시간 저녁 7시
   workflow_dispatch:
 jobs:
   run-bot:
