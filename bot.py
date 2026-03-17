@@ -10,47 +10,42 @@ def send_telegram(text):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     requests.post(url, data={'chat_id': CHAT_ID, 'text': text[:4000]})
 
-def get_data(operation):
-    today = datetime.now().strftime('%Y%m%d')
-    url = f"http://apis.data.go.kr/1230000/BidPublicInfoService05/{operation}"
+def test_busan_api():
+    # 부산 대기오염 예경보 발령 현황 조회 URL
+    url = "http://apis.data.go.kr/6260000/AirQualityInfoService/getAirQualityForecastInfo"
     
     params = {
-        'serviceKey': API_KEY,
+        'serviceKey': API_KEY, # 아까 그 똑같은 열쇠를 씁니다
         'type': 'json',
         'numOfRows': '10',
-        'inqryDiv': '1',
-        'inqryBgnDt': today + "0000",
-        'inqryEndDt': today + "2359"
+        'pageNo': '1'
     }
 
     try:
-        # 인증키를 URL에 직접 붙여서 보내는 가장 원시적이고 확실한 방법으로 시도
-        full_url = f"{url}?serviceKey={API_KEY}&type=json&numOfRows=10&inqryDiv=1&inqryBgnDt={today}0000&inqryEndDt={today}2359"
-        res = requests.get(full_url, timeout=30)
+        # 1. 일단 찔러보기
+        res = requests.get(url, params=params, timeout=30)
         
-        # 만약 결과가 정상이 아니면 상태 코드와 내용을 텔레그램으로 전송
-        if res.status_code != 200:
+        # 2. 상태 확인
+        if res.status_code == 200:
+            try:
+                data = res.json()
+                # 데이터가 정상적으로 들어있는지 확인
+                if 'getAirQualityForecastInfo' in data:
+                    return "✅ 성공! 열쇠(API 키)가 아주 잘 작동합니다. 조달청만 기다리면 되겠네요!"
+                else:
+                    return f"❓ 연결은 됐는데 내용이 좀 이상해요: {res.text[:100]}"
+            except:
+                return f"❓ 데이터 형식 에러 (인증키 등록 대기 중일 수 있음): {res.text[:100]}"
+        else:
             return f"❌ 서버 응답 실패 (코드: {res.status_code})"
-        
-        if not res.text.strip():
-            return "❌ 서버에서 빈 내용을 보냈습니다 (인증키 미등록 의심)"
             
-        # 데이터가 있으면 일단 성공으로 간주하고 리턴
-        return "SUCCESS"
-        
     except Exception as e:
-        return f"❌ 연결 자체 실패: {str(e)}"
+        return f"❌ 연결 실패: {str(e)}"
 
 def main():
-    send_telegram("🚀 디버깅 시작...")
-    
-    # 두 가지 서비스 중 하나라도 찔러봅니다.
-    status = get_data("getBidPblancListInfoThng")
-    
-    if status == "SUCCESS":
-        send_telegram("✅ 조달청 서버 연결 성공! 이제 공고가 올라오면 알림이 갈 겁니다.")
-    else:
-        send_telegram(f"결과: {status}\n\n💡 팁: 인증키를 '디코딩' 키로 넣으셨나요? 만약 그렇다면 1~2시간 뒤에 다시 해보세요.")
+    send_telegram("🧪 API 키 효능 테스트 시작 (부산 대기오염 데이터)...")
+    result = test_busan_api()
+    send_telegram(result)
 
 if __name__ == "__main__":
     main()
