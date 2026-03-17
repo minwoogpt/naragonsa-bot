@@ -9,7 +9,7 @@ TOKEN = os.environ['TELEGRAM_TOKEN']
 CHAT_ID = os.environ['TELEGRAM_CHAT_ID']
 
 # 찬우님 사업 맞춤 키워드
-KEYWORDS = ["창호", "유리", "금속제창", "샷시", "창문, "창틀"]
+KEYWORDS = ["창호", "유리", "금속제창", "샷시", "창문", "창틀"]
 
 def send_telegram(text):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
