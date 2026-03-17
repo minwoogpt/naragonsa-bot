@@ -23,9 +23,16 @@ def check_bid():
         'inqryEndDt': today + "2359"
     }
 
-    try:
+try:
         res = requests.get(url, params=params)
-        data = res.json()
+        
+        # [수정된 부분] JSON으로 바꾸기 전에 서버 응답이 정상인지 확인합니다
+        try:
+            data = res.json()
+        except Exception:
+            # 서버가 JSON이 아닌 에러 메시지(HTML/XML)를 보냈을 경우 그 내용을 전송합니다
+            send_msg(f"❌ 서버 응답 에러 (JSON 아님):\n{res.text[:200]}") # 에러 내용 앞부분 200자만
+            return
         
         found = []
         if 'body' in data['response'] and 'items' in data['response']['body']:
@@ -44,7 +51,7 @@ def check_bid():
             send_msg(f"📅 {today} 새로 올라온 관련 공고가 없습니다.")
             
     except Exception as e:
-        send_msg(f"❌ 에러 발생: {str(e)}")
+        send_msg(f"❌ 프로그램 실행 중 에러 발생: {str(e)}")
 
 def send_msg(text):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
