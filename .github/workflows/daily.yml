@@ -7,11 +7,11 @@ jobs:
   run-bot:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4  # v3에서 v4로 업데이트
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5 # v4에서 v5로 업데이트
         with:
-          python-version: '3.9'
+          python-version: '3.10' # 파이썬 버전도 조금 더 최신으로
       - name: Install dependencies
         run: pip install requests
       - name: Run bot
