@@ -18,7 +18,6 @@ def send_telegram(text):
 def get_bid_data(operation):
     all_items = []
     now = datetime.utcnow() + timedelta(hours=9)
-    # 최근 3일치 (17, 18, 19일)
     start_date = (now - timedelta(days=2)).strftime('%Y%m%d') + "0000"
     end_date = now.strftime('%Y%m%d') + "2359"
     
@@ -49,7 +48,6 @@ def get_bid_data(operation):
     return all_items
 
 def main():
-    # 물품과 공사 탭 집중 검색
     goods_list = get_bid_data("getBidPblancListInfoThng")
     const_list = get_bid_data("getBidPblancListInfoCnstwk")
     
@@ -58,21 +56,22 @@ def main():
     seen_ids = set()
     
     for item in all_items:
-        title = item.get('bidNtceNm', '') # 공고명
+        title = item.get('bidNtceNm', '')
         bid_no = item.get('bidNtceNo', '')
         
-        # 날짜 정보 (이름이 다를 경우를 대비해 여러 개 확인)
-        pub_date = item.get('ntcePblshDt') or item.get('bidNtceDt') or "날짜확인불가"
+        # [수정 핵심] 날짜 정보 - 여러 항목을 꼼꼼히 체크
+        pub_date = item.get('ntcePblshDt') or item.get('bidNtceDt') or "게시일 확인불가"
         end_date = item.get('bidClseDt') or "마감정보없음"
         
-        # 지역 제한 정보
-        region = item.get('rgstRtstrctNm') or "제한없음(전국)"
+        # [수정 핵심] 지역 정보 - 조달청 API의 여러 지역 필드를 모두 확인
+        # 1. prtcptPsblRgnNm (참가가능지역명) -> 웹의 '참가가능지역'과 일치함
+        # 2. rgstRtstrctNm (등록제한명)
+        region = item.get('prtcptPsblRgnNm') or item.get('rgstRtstrctNm') or "제한없음(전국)"
         
         if title and any(key in title for key in KEYWORDS):
             if bid_no not in seen_ids:
                 link = item.get('bidNtceDtlUrl', '#')
                 
-                # 찬우님 요청 형식: 제목 + 지역 + 게시 + 마감 + 링크
                 msg_unit = (
                     f"📍 {title}\n"
                     f"🌍 지역: {region}\n"
@@ -86,11 +85,10 @@ def main():
     now_str = (datetime.utcnow() + timedelta(hours=9)).strftime('%Y-%m-%d %H:%M')
     
     if found:
-        # 알림이 너무 길어질 수 있으니 10건씩 끊어서 보내거나 요약합니다.
-        message = f"✅ {now_str} 창호/유리 통합 알림\n(전체 {len(all_items)}건 중 {len(found)}건 발견)\n\n" + "\n\n".join(found)
+        message = f"✅ {now_str} 창호/유리 맞춤 알림\n(전체 {len(all_items)}건 중 {len(found)}건 발견)\n\n" + "\n\n".join(found)
         send_telegram(message)
     else:
-        message = f"🔍 {now_str} 확인 완료\n전체 {len(all_items)}건 중 키워드 일치 건이 없습니다."
+        message = f"🔍 {now_str} 확인 완료\n최근 3일 공고 중 일치 건이 없습니다."
         send_telegram(message)
 
 if __name__ == "__main__":
