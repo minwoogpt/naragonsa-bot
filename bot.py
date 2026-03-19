@@ -22,7 +22,6 @@ def get_bid_data(operation):
     start_date = (now - timedelta(days=2)).strftime('%Y%m%d') + "0000"
     end_date = now.strftime('%Y%m%d') + "2359"
     
-    # 데이터가 없을 때까지 끝까지 뒤집니다.
     for page in range(1, 11):
         url = f"http://apis.data.go.kr/1230000/ad/BidPublicInfoService/{operation}"
         params = {
@@ -40,21 +39,17 @@ def get_bid_data(operation):
             data = res.json()
             items = data.get('response', {}).get('body', {}).get('items', [])
             
-            if not items:
-                break
-            
+            if not items: break
             if isinstance(items, dict): items = [items]
             all_items.extend(items)
-            
-            if len(items) < 999:
-                break
+            if len(items) < 999: break
         except:
             break
             
     return all_items
 
 def main():
-    # 물품과 공사 탭만 집중적으로 검색
+    # 물품과 공사 탭 집중 검색
     goods_list = get_bid_data("getBidPblancListInfoThng")
     const_list = get_bid_data("getBidPblancListInfoCnstwk")
     
@@ -63,26 +58,40 @@ def main():
     seen_ids = set()
     
     for item in all_items:
-        title = item.get('bidNtceNm', '') # 공사명(공고명)
+        title = item.get('bidNtceNm', '') # 공고명
         bid_no = item.get('bidNtceNo', '')
-        # 게시 일시 (예: 2026-03-19 13:46)
-        pub_date = item.get('ntcePblshDt', '날짜 정보 없음') 
+        
+        # 날짜 정보 (이름이 다를 경우를 대비해 여러 개 확인)
+        pub_date = item.get('ntcePblshDt') or item.get('bidNtceDt') or "날짜확인불가"
+        end_date = item.get('bidClseDt') or "마감정보없음"
+        
+        # 지역 제한 정보
+        region = item.get('rgstRtstrctNm') or "제한없음(전국)"
         
         if title and any(key in title for key in KEYWORDS):
             if bid_no not in seen_ids:
                 link = item.get('bidNtceDtlUrl', '#')
-                # 찬우님이 요청하신 형식: 제목 + 게시날짜 + 링크
-                found.append(f"📍 {title}\n📅 게시: {pub_date}\n🔗 {link}")
+                
+                # 찬우님 요청 형식: 제목 + 지역 + 게시 + 마감 + 링크
+                msg_unit = (
+                    f"📍 {title}\n"
+                    f"🌍 지역: {region}\n"
+                    f"📅 게시: {pub_date}\n"
+                    f"⏳ 마감: {end_date}\n"
+                    f"🔗 {link}"
+                )
+                found.append(msg_unit)
                 seen_ids.add(bid_no)
 
     now_str = (datetime.utcnow() + timedelta(hours=9)).strftime('%Y-%m-%d %H:%M')
     
     if found:
-        message = f"✅ {now_str} 창호/유리 맞춤 알림\n(전체 {len(all_items)}건 중 {len(found)}건 발견)\n\n" + "\n\n".join(found)
+        # 알림이 너무 길어질 수 있으니 10건씩 끊어서 보내거나 요약합니다.
+        message = f"✅ {now_str} 창호/유리 통합 알림\n(전체 {len(all_items)}건 중 {len(found)}건 발견)\n\n" + "\n\n".join(found)
+        send_telegram(message)
     else:
-        message = f"🔍 {now_str} 확인 완료\n최근 3일 전체 {len(all_items)}건 중 일치하는 건이 없습니다."
-        
-    send_telegram(message)
+        message = f"🔍 {now_str} 확인 완료\n전체 {len(all_items)}건 중 키워드 일치 건이 없습니다."
+        send_telegram(message)
 
 if __name__ == "__main__":
     main()
